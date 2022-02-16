@@ -58,11 +58,44 @@ const CALL_BACK_TYPE = {
   postback: 'postback',
 }
 
+// const USERS = {
+//   admin: {
+//     MAC: '0C:19:F8:7B:EB:A5',
+//     NAME: '선현규',
+//     ID: `admin@botest`,
+//   },
+// }
+
 const USERS = {
-  admin: {
+  daum128: {
     MAC: '0C:19:F8:7B:EB:A5',
     NAME: '선현규',
-    ID: `admin@botest`,
+    ID: `daum128@nfun.kr`,
+  },
+  tokgnoin: {
+    MAC: '88:B9:45:41:8E:98',
+    NAME: '김민중',
+    ID: `tokgnoin@nfun.kr`,
+  },
+  moon: {
+    MAC: 'F0:C3:71:AE:80:28',
+    NAME: '문창환',
+    ID: `moon@nfun.kr`,
+  },
+  subin: {
+    MAC: '08:87:C7:77:EF:2C',
+    NAME: '강수빈',
+    ID: `subin@nfun.kr`,
+  },
+  jaekyeun: {
+    MAC: '90:8C:43:EC:14:4E',
+    NAME: '이재근',
+    ID: `jaekyeun@nfun.kr`,
+  },
+  qrury: {
+    MAC: 'A8:81:7E:9A:42:2F',
+    NAME: '강다영',
+    ID: `qrury@nfun.kr`,
   },
 }
 
@@ -207,43 +240,57 @@ module.exports = class BotMessageService {
               console.log(`start`)
               res.content = {
                 type: MESSAGE_CONTENT_TYPE.text,
-                text: '아래의 텍스트를 입력하면 응답합니다\n(소문자를 구분하지 않습니다).\n・b:button template\n・l:List template\n・c:carousel\n・i:image carousel\n・q:quick reply',
+                text: '#냥펀스튜디오 근태관리 봇 입니다#\n[!근태] 혹은 [!근태관리] 라고 입력하신 후\n사용하시면 됩니다',
               }
               return res
             } else if (callbackEvent.content.postback == '출근') {
               const id = callbackEvent.source.accountId.split('@')
-              const callbackDate = new Date(callbackEvent.createdTime)
+              const callbackDate = this.getCallbackTime(
+                new Date(callbackEvent.createdTime)
+              )
               let query = `SELECT _in FROM io_status WHERE mac = '${this.getMac(
                 id[0]
-              )}' AND date_format(lastupdate,'%Y-%m-%d') = '${this.getCallbackDate(
-                callbackDate
-              )}';`
-
-              const result = await (await connection).execute(query)
-
-              if (result[0].length > 0) {
-                res.content = {
-                  type: MESSAGE_CONTENT_TYPE.text,
-                  text: '오늘은 이미 출근하셨습니다',
-                }
-                return res
-              } else {
-                query = `INSERT 
-                INTO io_status(mac,name,now,lastupdate,_in,who) 
-                VALUES('${this.getMac(id[0])}', 
-                '${this.getName(id[0])}',
-                'IN','${this.getCallbackTime(callbackDate)}',
-                '${this.getCallbackTime(callbackDate)}','P');`
-
-                const insertResult = await (await connection).execute(query)
-                if (insertResult[0].affectedRows > 0) {
-                  console.log('insert 성공')
+              )}' AND date_format(lastupdate,'%Y-%m-%d') = date_format('${callbackDate}','%Y-%m-%d');`
+              try {
+                console.log(query)
+                const result = await (await connection).execute(query)
+                console.log(result[0])
+                if (result[0][0]._in !== null) {
                   res.content = {
                     type: MESSAGE_CONTENT_TYPE.text,
-                    text: '출근처리 되었습니다',
+                    text: `${this.getName(
+                      id[0]
+                    )}님은\n오늘 이미 출근하셨습니다\n출근시간 : ${callbackDate}`,
+                  }
+                  return res
+                } else {
+                  query = `UPDATE io_status 
+                  SET now = 'IN',
+                  lastupdate = '${callbackDate}',
+                  _in = '${callbackDate}'
+                  WHERE date_format('${callbackDate}','%y-%m-%d') 
+                  = date_format(lastupdate,'%y-%m-%d') 
+                  AND mac = '${this.getMac(id[0])}';`
+                  console.log(`update query ::
+                  ${query}`)
+                  const updateResult = await (await connection).execute(query)
+                  if (updateResult[0].affectedRows > 0) {
+                    console.log('update 성공')
+                    res.content = {
+                      type: MESSAGE_CONTENT_TYPE.text,
+                      text: '출근처리 되었습니다',
+                    }
+                    return res
+                  }
+                  res.content = {
+                    type: MESSAGE_CONTENT_TYPE.text,
+                    text: '아직 출근하지 않았습니다',
                   }
                   return res
                 }
+              } catch (err) {
+                console.error(`Database connection error: ${err.message}`)
+                // put any other required error handling here
               }
             } else if (callbackEvent.content.postback == '퇴근') {
               const id = callbackEvent.source.accountId.split('@')
@@ -255,47 +302,42 @@ module.exports = class BotMessageService {
                 id[0]
               )}' AND date_format(lastupdate,'%Y-%m-%d') = '${callbackDate}';`
 
-              const result = await (await connection).execute(query)
-
-              if (result[0].length < 0) {
-                res.content = {
-                  type: MESSAGE_CONTENT_TYPE.text,
-                  text: `오늘 ${callbackDate} 출근 기록이 없습니다`,
-                }
-                return res
-              } else {
-                query = `UPDATE io_status 
-              SET lastupdate = '${callbackDate}',
-              _out = '${callbackDate}'
-              WHERE date_format('${callbackDate}','%y-%m-%d') 
-              = date_format(lastupdate,'%y-%m-%d') 
-              AND mac = '${this.getMac(id[0])}';`
-                const updateResult = await (await connection).execute(query)
-
-                if (updateResult[0].affectedRows > 0) {
-                  console.log('update 성공')
+              try {
+                const result = await (await connection).execute(query)
+                if (result[0].length < 0) {
                   res.content = {
                     type: MESSAGE_CONTENT_TYPE.text,
-                    text: '퇴근처리 되었습니다',
+                    text: `오늘 ${callbackDate} 출근 기록이 없습니다`,
                   }
                   return res
+                } else {
+                  query = `UPDATE io_status 
+                SET now = 'OUT',
+                lastupdate = '${callbackDate}',
+                _out = '${callbackDate}'
+                WHERE date_format('${callbackDate}','%y-%m-%d') 
+                = date_format(lastupdate,'%y-%m-%d') 
+                AND mac = '${this.getMac(id[0])}';`
+                  const updateResult = await (await connection).execute(query)
+
+                  if (updateResult[0].affectedRows > 0) {
+                    console.log('update 성공')
+                    res.content = {
+                      type: MESSAGE_CONTENT_TYPE.text,
+                      text: '퇴근처리 되었습니다',
+                    }
+                    return res
+                  }
                 }
+              } catch (err) {
+                console.error(`Database connection error: ${err.message}`)
+                // put any other required error handling here
               }
-            } else if (
-              callbackEvent.content.text &&
-              (callbackEvent.content.text == '!근태' ||
-                callbackEvent.content.text == '!근태관리')
-            ) {
+            } else {
               res.content = {
                 type: MESSAGE_CONTENT_TYPE.buttonTemplate,
                 contentText: '해당하는 버튼을 클릭하세요',
                 actions: this._getButtonActions(),
-              }
-              return res
-            } else {
-              res.content = {
-                type: MESSAGE_CONTENT_TYPE.text,
-                text: `"${callbackEvent.content.text}"\n알 수 없는 명령어 입니다`,
               }
               return res
             }

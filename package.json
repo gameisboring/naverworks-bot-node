@@ -1,17 +1,18 @@
 {
-  "name": "line-works-bot01-node",
+  "name": "naver-works-bot",
   "main": "server.js",
-  "description": "LINE WORKS Bot01 node.js",
-  "version": "2.0.0",
+  "description": "NAVER WORKS Bot node.js",
+  "version": "1.0.0",
   "private": false,
-  "engines": {
-    "node": "10.*"
-  },
   "scripts": {
-    "start": "nodemon server.js"
+    "start": "node server.js",
+    "server": "nodemon server.js"
   },
   "repository": {
     "type": "git"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15"
   },
   "dependencies": {
     "crypto": "^1.0.1",
@@ -21,9 +22,8 @@
     "jsonwebtoken": "^8.5.1",
     "mysql": "^2.18.1",
     "mysql2": "^2.3.3",
-    "nodemon": "^2.0.15",
     "querystring": "^0.2.0",
     "request": "^2.88.0"
   },
-  "author": "gameisboring"
+  "author": ""
 }
