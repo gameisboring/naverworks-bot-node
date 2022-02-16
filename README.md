@@ -1,18 +1,7 @@
-# LINE WORKS Bot API 를 한차례 만져보다（node.js）
+# NAVERWORKS BOT (node.js）
 
-LINE WORKS Bot API를 node.js로 한번 만져보는 프로그램입니다.
-
-## Qiita の記事
-
-[#1](https://qiita.com/shotamaco/items/bd510729adc0497d7d0b)
-
-# Table of Contents
-
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Link](#link)
-- [License](#license)
+NAVER WORKS Bot API를 node.js를 사용하여
+사용할 수 있는 코드입니다.
 
 # Requirements
 
@@ -33,13 +22,15 @@ npm install
 
 # Usage
 
-1. http 3000으로 ngrok 부팅!
+1. ngrok으로 부팅하여 콜백 url을 취득해주세요
 
 ```
 ngrok http 3000
 ```
 
-2. NAVER WORKS Developer Console에서 Bot서버가 NAVER WORKS와 통신하는데 필요한 접속정보 발급 및 Bot등록을 수행한다.
+2. NAVER WORKS Developer Console에서
+   Bot서버가 NAVER WORKS와 통신하는데 필요한
+   접속정보 발급 및 Bot등록을 수행한다.
 
 ※ Bot 등록시 지정하는 Callback URL은, [ngrok](https://ngrok.com/)을 이용하여 취득한 Forwarding 의 https 의 URL 입니다.
 
@@ -55,11 +46,11 @@ CONSUMER_KEY="Consumer key"
 SERVER_ID="Server ID"
 PRIVATE_KEY="인증 키"
 BOT_NO="Bot No"
-IMAGE_FILE_HOST="호스트 이름 (ngrok으로 취득한 호스트 https://xxxxx.io）"
+IMAGE_FILE_HOST="호스트 이름 (ngrok으로 취득한 호스트 https://xxxxx.XXX）"
 ```
 
 5. VS Code debug start
-6. NAVER WORKS mobile app에서 3에서 등록한 Bot과 토크를 진행합니다.
+6. NAVER WORKS mobile app에서 3에서 등록한 Bot과 대화를 진행합니다.
 
 # License
 
