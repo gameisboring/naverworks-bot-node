@@ -1,5 +1,7 @@
 const request = require('request')
 const connection = require('./lib/db')
+
+const USERS = require('./lib/user')
 /* async function test() {
   let result = await (await connection).execute('SELECT * FROM io_status')
 
@@ -58,46 +60,7 @@ const CALL_BACK_TYPE = {
   postback: 'postback',
 }
 
-// const USERS = {
-//   admin: {
-//     MAC: '0C:19:F8:7B:EB:A5',
-//     NAME: '선현규',
-//     ID: `admin@botest`,
-//   },
-// }
-
-const USERS = {
-  daum128: {
-    MAC: '0C:19:F8:7B:EB:A5',
-    NAME: '선현규',
-    ID: `daum128@nfun.kr`,
-  },
-  tokgnoin: {
-    MAC: '88:B9:45:41:8E:98',
-    NAME: '김민중',
-    ID: `tokgnoin@nfun.kr`,
-  },
-  moon: {
-    MAC: 'F0:C3:71:AE:80:28',
-    NAME: '문창환',
-    ID: `moon@nfun.kr`,
-  },
-  subin: {
-    MAC: '08:87:C7:77:EF:2C',
-    NAME: '강수빈',
-    ID: `subin@nfun.kr`,
-  },
-  jaekyeun: {
-    MAC: '90:8C:43:EC:14:4E',
-    NAME: '이재근',
-    ID: `jaekyeun@nfun.kr`,
-  },
-  qrury: {
-    MAC: 'A8:81:7E:9A:42:2F',
-    NAME: '강다영',
-    ID: `qrury@nfun.kr`,
-  },
-}
+/* const USERS =  */
 
 /**
  * 콜백 콘텐츠 타입
@@ -156,11 +119,14 @@ module.exports = class BotMessageService {
     let res = new Promise((resolve, reject) => {
       resolve(this._getResponse(callbackEvent))
     })
+
     res.then((value) => {
       if (!value) {
+        console.log('value is empty....')
         console.log(value)
         return
       } else {
+        console.log('value is not empty!!!!')
         return new Promise((resolve, reject) => {
           // NAVER WORKS 에게 메시지 보내기 요청
           request.post(this._createMessage(value), (error, response, body) => {
@@ -171,8 +137,43 @@ module.exports = class BotMessageService {
             resolve()
           })
         })
+        /* .then((value) => {
+          if (value.content.type !== 'button_template') {
+            value.content.type = 'button_template'
+            value.content.text = '해당하는 버튼을 클릭하세요'
+            value.content.actions = this._getButtonActions()
+
+            console.log(value)
+            request.post(
+              this._createMessage(value),
+              (error, response, body) => {
+                if (error) {
+                  console.log('BotService.send error')
+                  console.log(error)
+                }
+                console.log('post2122221212')
+              }
+            )
+          }
+        }) */
       }
     })
+    /* .then(async () => {
+        
+        callbackEvent.content.postback = 'return'
+
+        let res = new Promise((resolve, reject) => {
+          resolve(this._getResponse(callbackEvent))
+        })
+        res.then((value) => {
+          request.post(this._createMessage(value), (error, response, body) => {
+            if (error) {
+              console.log('BotService.send error')
+              console.log(error)
+            }
+          })
+        })
+      }) */
   }
 
   /**
@@ -208,7 +209,7 @@ module.exports = class BotMessageService {
   }
 
   /**
-   * Bot실작동부
+   * Bot 실작동부
    * @param {object} callbackEvent 요청 콜백 이벤트
    * @return {string} 리스폰스 메시지
    */
@@ -230,45 +231,61 @@ module.exports = class BotMessageService {
     // 콜백이벤트 타입에 따른 스위치 문
     if (callbackEvent.type === CALL_BACK_TYPE.message) {
       // 메세지 형식에 따른 스위치문
-      switch (callbackEvent.content.type) {
+      if (callbackEvent.content.type === CALL_BACK_MESSAGE_CONTENT_TYPE.text) {
         // 메세지가 텍스트인 케이스
-        case CALL_BACK_MESSAGE_CONTENT_TYPE.text:
-          const id = callbackEvent.source.accountId.split('@')
-          const callbackTime = this.getCallbackTime(
-            new Date(callbackEvent.createdTime)
-          )
+        const id = callbackEvent.source.accountId.split('@')
+        const callbackTime = this.getCallbackTime(
+          new Date(callbackEvent.createdTime)
+        )
+        const callbackDate = this.getCallbackDate(
+          new Date(callbackEvent.createdTime)
+        )
 
-          if (!this.getMac(id[0])) {
-            console.log(`등록되지 않은 사용자 접근`)
-            res.content = {
-              type: MESSAGE_CONTENT_TYPE.text,
-              text: '등록되지 않은 사용자 입니다',
-            }
-            return res
+        if (!this.getMac(id[0])) {
+          console.log(`등록되지 않은 사용자 접근`)
+          res.content = {
+            type: MESSAGE_CONTENT_TYPE.text,
+            text: '등록되지 않은 사용자 입니다',
           }
-
-          if (callbackEvent.content.postback == 'start') {
-            // 멤버와 Bot과의 첫 토크를 시작하는 화면에서 '이용 시작'을 누르면 자동으로 '이용 시작'이라는 메시지가 호출된다.
+          return res
+        }
+        switch (callbackEvent.content.postback) {
+          // 사용자가 BOT과의 메시지방을 개설하고 '대화시작' 클릭 후 액션
+          case 'start': {
             console.log(`start`)
             res.content = {
               type: MESSAGE_CONTENT_TYPE.text,
               text: '냥펀스튜디오 근태관리 봇 입니다!\n아무말이나 입력하신 후\n사용하시면 됩니다',
             }
             return res
-          } else if (callbackEvent.content.postback == '출근') {
+          }
+
+          // "출근하기" 버튼 클릭 액션
+          case '출근': {
             let query = `SELECT _in FROM io_status WHERE mac = '${this.getMac(
               id[0]
             )}' AND date_format(lastupdate,'%Y-%m-%d') = date_format('${callbackTime}','%Y-%m-%d');`
             try {
+              // 출근 처리 요청 로그
+              console.log(
+                `${this.getName(
+                  id[0]
+                )} 님 ${callbackTime}에 출근처리(UPDATE) 요청`
+              )
+              // DB 조회 쿼리 실행문
               const result = await (await connection).execute(query)
               if (result[0][0]._in !== null) {
-                console.log(result[0][0]._in.toLocaleString())
+                // 중복 출근 요청 로그
+                console.log(
+                  `${result[0][0]._in.toLocaleString()}에 출근 처리되어있음`
+                )
                 res.content = {
                   type: MESSAGE_CONTENT_TYPE.text,
                   text: `${this.getName(
                     id[0]
                   )}님은\n오늘 이미 출근하셨습니다\n출근시간 : ${result[0][0]._in.toLocaleString()}`,
                 }
+
                 return res
               } else {
                 query = `UPDATE io_status 
@@ -278,74 +295,104 @@ module.exports = class BotMessageService {
                   WHERE date_format('${callbackTime}','%y-%m-%d') 
                   = date_format(lastupdate,'%y-%m-%d') 
                   AND mac = '${this.getMac(id[0])}';`
-                console.log(`update query ::
-                  ${query}`)
+
                 const updateResult = await (await connection).execute(query)
                 if (updateResult[0].affectedRows > 0) {
                   console.log('update 성공')
                   res.content = {
                     type: MESSAGE_CONTENT_TYPE.text,
-                    text: '출근처리 되었습니다',
+                    text: `${callbackTime}에\n출근 처리 되었습니다`,
+                  }
+                  return res
+                } else {
+                  res.content = {
+                    type: MESSAGE_CONTENT_TYPE.text,
+                    text: '출근 처리에 실패했습니다',
                   }
                   return res
                 }
-                res.content = {
-                  type: MESSAGE_CONTENT_TYPE.text,
-                  text: '아직 출근하지 않았습니다',
-                }
-                return res
               }
             } catch (err) {
               console.error(`Database connection error: ${err.message}`)
             }
-          } else if (callbackEvent.content.postback == '퇴근') {
-            const id = callbackEvent.source.accountId.split('@')
-            const callbackDate = this.getCallbackTime(
-              new Date(callbackEvent.createdTime)
-            )
+          }
 
+          // "퇴근하기" 버튼 클릭 액션
+          case '퇴근': {
             let query = `SELECT _in FROM io_status WHERE mac = '${this.getMac(
               id[0]
             )}' AND date_format(lastupdate,'%Y-%m-%d') = date_format('${callbackTime}','%Y-%m-%d');`
 
             try {
               const result = await (await connection).execute(query)
+
               if (result[0][0]._in === null) {
                 res.content = {
                   type: MESSAGE_CONTENT_TYPE.text,
-                  text: `오늘 (${this.getCallbackDate(
-                    new Date(callbackEvent.createdTime)
-                  )}) 출근 기록이 없습니다`,
+                  text: `오늘 (${callbackDate}) 출근 기록이 없습니다`,
                 }
                 return res
               } else {
                 query = `UPDATE io_status 
-                SET now = 'OUT',
-                lastupdate = '${callbackDate}',
-                _out = '${callbackDate}'
-                WHERE date_format('${callbackDate}','%y-%m-%d') 
-                = date_format(lastupdate,'%y-%m-%d') 
-                AND mac = '${this.getMac(id[0])}';`
+                  SET now = 'OUT',
+                  lastupdate = '${callbackTime}',
+                  _out = '${callbackTime}'
+                  WHERE date_format('${callbackTime}','%y-%m-%d') 
+                  = date_format(lastupdate,'%y-%m-%d') 
+                  AND mac = '${this.getMac(id[0])}';`
                 const updateResult = await (await connection).execute(query)
 
                 if (updateResult[0].affectedRows > 0) {
                   console.log('update 성공')
-                  const workTime = await this.getWorkTime(callbackDate, id[0])
+                  const workTime = await this.getWorkTime(callbackTime, id[0])
                   const workTime2String = `${workTime[0][0].worked_hour}시간 ${workTime[0][0].worked_minute}분`
-                  console.log(workTime[0][0])
                   res.content = {
                     type: MESSAGE_CONTENT_TYPE.text,
                     text: `퇴근처리 되었습니다.\n오늘 근무시간 : ${workTime2String}`,
                     //text: `퇴근처리 되었습니다`,
                   }
                   return res
+                } else {
+                  console.log('update 에 실패했습니다')
                 }
               }
             } catch (err) {
               console.error(`Database connection error (퇴근): ${err.message}`)
-              // put any other required error handling here
             }
-          } else {
+          }
+          // "근무시간 확인" 버튼 클릭 액션
+          case '근무시간': {
+            res.content = {
+              type: MESSAGE_CONTENT_TYPE.buttonTemplate,
+              contentText: '해당하는 버튼을 클릭하세요',
+              actions: this._getTimeButtonActions(),
+            }
+            return res
+          }
+
+          // "근무시간 확인" -> "이번주 근무시간 조회" 버튼 클릭 액션
+          case 'week': {
+            const thisWeekWorkTime = await this.getThisWeekWorkTime(id[0])
+            console.log(thisWeekWorkTime)
+            let sum = 0
+            for (var i in thisWeekWorkTime) {
+              sum = sum + thisWeekWorkTime[i].worked_time
+            }
+            console.log(
+              `이번주총근무시간 :: ${sum} :: ${Math.floor(sum / 60)}시간 ${
+                sum % 60
+              }분`
+            )
+            res.content = {
+              type: MESSAGE_CONTENT_TYPE.text,
+              text: `${this.getName(id[0])}님은 이번주\n총 [${Math.floor(
+                sum / 60
+              )}시간 ${sum % 60}분]\n근무 하셨습니다`,
+            }
+            return res
+          }
+          // 아무말이나 입력했을 때 액션
+          default: {
             res.content = {
               type: MESSAGE_CONTENT_TYPE.buttonTemplate,
               contentText: '해당하는 버튼을 클릭하세요',
@@ -353,11 +400,14 @@ module.exports = class BotMessageService {
             }
             return res
           }
-          break
-        default:
-          console.log('알 수 없는 content type')
-          return null
+        }
+      } else {
+        console.log('알 수 없는 content type')
+        return null
       }
+    } else {
+      console.log('알 수 없는 callback type')
+      return null
     }
   }
 
@@ -379,10 +429,39 @@ module.exports = class BotMessageService {
         text: '퇴근 요청',
         postback: '퇴근',
       },
+      /* {
+        type: 'message',
+        label: '근무시간 확인',
+        text: '근무시간 확인',
+        postback: '근무시간',
+      }, */
       {
         type: 'uri',
-        label: 'BigBrother',
+        label: '빅브라더',
         uri: 'http://n.nfun.kr:8023/flex',
+      },
+    ]
+  }
+
+  _getTimeButtonActions() {
+    return [
+      {
+        type: 'message',
+        label: '이번주 근무시간 조회',
+        text: '이번주 근무시간',
+        postback: 'week',
+      },
+      {
+        type: 'message',
+        label: '월별 근무시간 조회',
+        text: '월별 근무시간',
+        postback: 'month',
+      },
+      {
+        type: 'message',
+        label: '분기별 근무시간 조회',
+        text: '분기별 근무시간',
+        postback: 'quarter',
       },
     ]
   }
@@ -395,18 +474,31 @@ module.exports = class BotMessageService {
   }
 
   async getWorkTime(callbackDate, id) {
-    try {
-      const query = `SELECT truncate(timestampdiff(minute,_in,_out) / 60,0) as worked_hour,
+    const query = `SELECT truncate(timestampdiff(minute,_in,_out) / 60,0) as worked_hour,
     timestampdiff(minute,_in,_out) % 60 as worked_minute
     ,_in,_out FROM \`bt-at\`.io_status WHERE mac = '${await this.getMac(
       id
     )}' AND date_format(lastupdate,'%Y-%m-%d') = date_format('${callbackDate}','%Y-%m-%d');`
-
-      console.log(query)
+    try {
       const result = await (await connection).execute(query)
       return result
     } catch (err) {
       console.error(`Database connection error (getWorkTime): ${err.message}`)
+    }
+  }
+  async getThisWeekWorkTime(id) {
+    const query = `SELECT timestampdiff(minute,_in,_out) AS 'worked_time' FROM \`bt-at\`.io_status
+    WHERE date(lastupdate) BETWEEN subdate(curdate(),date_format(curdate(),'%w')-1) 
+    AND subdate(curdate(),date_format(curdate(),'%w')-7)
+    AND mac = '${this.getMac(id)}';`
+
+    try {
+      const result = await (await connection).execute(query)
+      return result[0]
+    } catch (err) {
+      console.error(
+        `Database connection error (getThisWeekWorkTime): ${err.message}`
+      )
     }
   }
 
