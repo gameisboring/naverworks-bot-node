@@ -1,4 +1,6 @@
 const express = require('express')
+const bodyParser = require('body-parser')
+
 const fs = require('fs')
 const app = express()
 require('dotenv').config()
@@ -6,17 +8,16 @@ const crypto = require('crypto')
 const jwt = require('jsonwebtoken')
 const request = require('request')
 const BotMessageService = require('./BotMessageService')
+const { ok } = require('assert')
 
 var port = process.env.PORT || 3000
 app.listen(port, function () {
-  console.log(
-    'To view your app, open this link in your browser: http://localhost:' + port
-  )
+  console.log(`${port}번 포트에서 서버작동중 ! `)
 })
 
-app.use(express.static(__dirname + '/public'))
-
-app.use(
+app.set('views', './views')
+app.set('view engine', 'ejs')
+/* app.use(
   express.json({
     verify: (req, res, buf, encoding) => {
       // 메시지 조작 방지
@@ -29,19 +30,31 @@ app.use(
       if (data !== signature) {
         throw 'NOT_MATCHED signature'
       }
+      console.log(data)
+      console.log(signature)
     },
   })
-)
+) */
+app.use(bodyParser.urlencoded({ extended: true }))
+app.use(bodyParser.json())
 
 /*
- * 소통확인API
+ * 연결상태 확인 API
  */
 app.get('/', function (req, res) {
   res.send('서버 작동중 !')
 })
 
+app.get('/admin', function (req, res) {
+  res.render('admin')
+})
+
+app.post('/updateIO', function (req, res) {
+  res.send('ok')
+})
+
 /**
- * LINE WORKS 로부터의 메시지를 수신하는 API
+ * NAVER WORKS 로부터의 메시지를 수신하는 API
  */
 app.post('/callback', async function (req, res, next) {
   res.sendStatus(200)
@@ -82,7 +95,7 @@ function createJWT() {
 }
 
 /**
- * LINE WORKS 에서 Server 토큰을 가져옵니다.
+ * NAVER WORKS 에서 Server 토큰을 가져옵니다.
  * @return {string} Server 토큰
  */
 async function getServerTokenFromLineWorks() {

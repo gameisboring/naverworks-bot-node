@@ -2,21 +2,8 @@ const request = require('request')
 
 const pool = require('./lib/db')
 
-/* let pool = mysql.createPool(
-  {
-    // host 바꾸기
-    host: DB_HOST,
-    user: DB_USER,
-    port: 3306,
-    password: DB_PASSWORD,
-    database: DB_DATABASE,
-    connectionLimit: 2,
-  },
-  console.log('MYSQL Pool Created !')
-) */
-
 pool.on('acquire', function (connection) {
-  console.log(`Connection ${connection.threadId} acquired`)
+  console.log(`커넥션 풀에서 ${connection.threadId} 번 커넥션 수령`)
 })
 
 pool.on('connection', function (connection) {
@@ -24,68 +11,24 @@ pool.on('connection', function (connection) {
 })
 
 pool.on('release', function (connection) {
-  console.log(`Connection ${connection.threadId} released`)
+  console.log(`커넥션 풀에 ${connection.threadId} 번 커넥션 반납`)
 })
 
 const USERS = require('./lib/user')
-/* async function test() {
-  let result = await (await connection).execute('SELECT * FROM io_status')
-
-  console.log(result[0])
-} */
 /**
  * 콜백 타입
  */
 const CALL_BACK_TYPE = {
   /**
-   * 회원의 메시지
+   * 봇이 받는 메시지
    */
   message: 'message',
-  /**
-   * Bot이 여러 명의 대화방에 초대되었습니다.
-   * 이 이벤트가 호출되는 타이밍
-   * · API를 사용하여 Bot이 토크 룸을 생성했습니다.
-   * · API를 사용하여 Bot이 토크 룸을 생성했습니다.
-   * · 회원이 Bot을 포함한 대화방을 만들었습니다.
-   * · Bot이 여러 명의 대화방에 초대되었습니다.
-   * ※멤버 1명과 Bot의 토크룸에 다른 멤버를 초대하면 join이 콜된다(첫 1회만)
-   * 초대한 멤버를 탈퇴시키고 다시 다른 멤버를 초대하면 joined가 호출되는 이 사양?
-   */
   join: 'join',
-  /**
-   * Bot이 여러 명의 대화방에서 퇴실했습니다.
-   * 이 이벤트가 호출되는 타이밍
-   * · API를 사용하여 Bot을 퇴실시켰다.
-   * · 멤버가 Bot을 토크 룸에서 퇴실 시켰습니다.
-   * · 어떤 이유로 여러 명의 토크 룸이 해산되었습니다.
-   */
   leave: 'leave',
-  /**
-   * 회원이 Bot이 있는 대화방에 참가했습니다.
-   * 이 이벤트가 호출되는 타이밍
-   * · Bot이 토크 룸을 생성했습니다.
-   * · Bot이 다른 회원을 대화방에 초대했습니다.
-   * · 대화방에 있는 회원이 다른 회원을 초대했습니다.
-   */
   joined: 'joined',
-  /**
-   * 회원이 Bot이 있는 대화방에서 퇴실함
-   * 이 이벤트가 호출되는 타이밍
-   * · Bot이 속한 토크 룸에서 멤버가 스스로 퇴실했거나 퇴실시켰습니다.
-   * · 어떤 이유로 토크 룸이 해산되었습니다.
-   */
   left: 'left',
-  /**
-   * postback 유형의 메시지
-   * 이 이벤트가 호출되는 타이밍
-   * · 메시지 전송 (Carousel)
-   * · 메시지 전송 (Image Carousel)
-   * ・토크리치 메뉴
-   */
   postback: 'postback',
 }
-
-/* const USERS =  */
 
 /**
  * 콜백 콘텐츠 타입
@@ -166,10 +109,6 @@ module.exports = class BotMessageService {
     })
   }
 
-  /**
-   * NAVER WORKS 에 보낼 Bot 메시지를 작성하여 반환합니다.
-   * @param {object} res 리스폰스 데이터
-   */
   _createMessage(res) {
     return {
       url: `https://apis.worksmobile.com/r/${process.env.API_ID}/message/v1/bot/${process.env.BOT_NO}/message/push`,
@@ -207,8 +146,6 @@ module.exports = class BotMessageService {
     // first
     console.log(callbackEvent)
 
-    // DB 연결
-
     // 리스폰스 객체 선언
     let res = {}
 
@@ -220,12 +157,13 @@ module.exports = class BotMessageService {
       res.accountId = callbackEvent.source.accountId
     }
 
-    // 콜백이벤트 타입에 따른 스위치 문
+    // 봇이 사용자로부터 메세지를 전달받음
     if (callbackEvent.type === CALL_BACK_TYPE.message) {
-      // 메세지 형식에 따른 스위치문
+      // 메시지의 타입은 텍스트임
       if (callbackEvent.content.type === CALL_BACK_MESSAGE_CONTENT_TYPE.text) {
-        // 메세지가 텍스트인 케이스
+        // 아이디 추상화
         const id = callbackEvent.source.accountId.split('@')
+        //
         const callbackTime = this.getCallbackTime(
           new Date(callbackEvent.createdTime)
         )
@@ -254,9 +192,7 @@ module.exports = class BotMessageService {
 
           // "출근하기" 버튼 클릭 액션
           case '출근': {
-            let query = `SELECT _in FROM io_status WHERE mac = '${this.getMac(
-              id[0]
-            )}' AND date_format(lastupdate,'%Y-%m-%d') = date_format('${callbackTime}','%Y-%m-%d');`
+            let query = `SELECT _in FROM io_status WHERE mac = ? AND date_format(lastupdate,'%Y-%m-%d') = date_format(?,'%Y-%m-%d');`
             try {
               // 출근 처리 요청 로그
               console.log(
@@ -265,8 +201,12 @@ module.exports = class BotMessageService {
                 )} 님 ${callbackTime}에 출근처리(UPDATE) 요청`
               )
               // DB 조회 쿼리 실행문
-              const result = await pool.query(query)
-              if (result[0][0]._in !== null) {
+              const result = await pool.query(query, [
+                this.getMac(id[0]),
+                callbackTime,
+              ])
+              // 출근 정보가 있는 경우
+              if (result[0][0]._in) {
                 // 중복 출근 요청 로그
                 console.log(
                   `${result[0][0]._in.toLocaleString()}에 출근 처리되어있음`
@@ -576,7 +516,7 @@ module.exports = class BotMessageService {
   }
 
   async getThisWeekWorkTime(id) {
-    const query = `SELECT date_format(lastupdate,'%a') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',DATE_ADD(NOW(),INTERVAL 8 HOUR),_out)) AS 'worked_time' FROM io_status WHERE date(lastupdate)
+    const query = `SELECT date_format(lastupdate,'%a') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',lastupdate,_out)) AS 'worked_time' FROM io_status WHERE date(lastupdate)
     BETWEEN SUBDATE(DATE(DATE_ADD(NOW(),INTERVAL 8 HOUR)),DATE_FORMAT(DATE_ADD(NOW(),INTERVAL 8 HOUR), '%w'))
     AND SUBDATE(date(DATE_ADD(NOW(),INTERVAL 8 HOUR)),DATE_FORMAT(DATE_ADD(NOW(),INTERVAL 8 HOUR),'%w')-6)
     AND mac = '${this.getMac(id)}';`
@@ -592,7 +532,7 @@ module.exports = class BotMessageService {
   }
 
   async getQuaterWorkedTime(id) {
-    const query = `SELECT date_format(lastupdate,'%d') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',DATE_ADD(NOW(),INTERVAL 8 HOUR),_out)) AS 'worked_time'
+    const query = `SELECT date_format(lastupdate,'%d') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',lastupdate,_out)) AS 'worked_time'
     FROM io_status where quarter(lastupdate) = 1 
     AND mac = '${this.getMac(id)}';`
     try {
@@ -607,7 +547,7 @@ module.exports = class BotMessageService {
 
   async getMonthlyWorkTime(id, when) {
     if (when === 'this') {
-      const query = `SELECT date_format(lastupdate,'%d') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',DATE_ADD(NOW(),INTERVAL 8 HOUR),_out)) AS 'worked_time'
+      const query = `SELECT date_format(lastupdate,'%d') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',lastupdate,_out)) AS 'worked_time'
     FROM io_status where date_format(lastupdate,'%m') = DATE_FORMAT(DATE_ADD(NOW(),INTERVAL 8 HOUR), '%m')
     AND mac = '${this.getMac(id)}';`
       try {
@@ -619,7 +559,7 @@ module.exports = class BotMessageService {
         )
       }
     } else if (when === 'last') {
-      const query = `SELECT date_format(lastupdate,'%d') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',DATE_ADD(NOW(),INTERVAL 8 HOUR),_out)) AS 'worked_time'
+      const query = `SELECT date_format(lastupdate,'%d') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',lastupdate,_out)) AS 'worked_time'
       FROM io_status where date_format(lastupdate,'%m') = DATE_FORMAT(LAST_DAY(NOW() - interval 1 month), '%m') 
       AND mac = '${this.getMac(id)}';`
       try {
@@ -676,6 +616,7 @@ module.exports = class BotMessageService {
     return `${year}-${month}-${date} ${hours}:${minutes}:${seconds}`
   }
 }
+pool.query('SELECT 1')
 setInterval(function () {
   pool.query('SELECT 1')
   console.log(`db ping | ${Date()}`)
