@@ -4,11 +4,11 @@ const bodyParser = require('body-parser')
 const fs = require('fs')
 const app = express()
 require('dotenv').config()
-const crypto = require('crypto')
+// const crypto = require('crypto')
 const jwt = require('jsonwebtoken')
 const request = require('request')
 const BotMessageService = require('./BotMessageService')
-const { ok } = require('assert')
+const AdminService = require('./adminService')
 
 var port = process.env.PORT || 3000
 app.listen(port, function () {
@@ -17,10 +17,10 @@ app.listen(port, function () {
 
 app.set('views', './views')
 app.set('view engine', 'ejs')
+// 메시지 조작 방지
 /* app.use(
   express.json({
     verify: (req, res, buf, encoding) => {
-      // 메시지 조작 방지
       const data = crypto
         .createHmac('sha256', process.env.API_ID)
         .update(buf)
@@ -49,13 +49,15 @@ app.get('/admin', function (req, res) {
   res.render('admin')
 })
 
-app.post('/updateIO', function (req, res) {
-  res.send('ok')
+app.post('/updateIO', async function (req, res) {
+  console.log(req.body)
+  const { name, date, in_time, out_time } = req.body
+  const adminService = new AdminService()
+  await adminService._upUserIO(name, date, in_time, out_time)
+
+  res.sendStatus(200)
 })
 
-/**
- * NAVER WORKS 로부터의 메시지를 수신하는 API
- */
 app.post('/callback', async function (req, res, next) {
   res.sendStatus(200)
   try {
@@ -100,10 +102,6 @@ function createJWT() {
  */
 async function getServerTokenFromLineWorks() {
   const jwtData = await createJWT()
-  // 주의:
-  // 이 샘플에서는 유효기간 1시간 Server 토큰을 요청이 올 때마다 LINE WORKS에서 가져옵니다.
-  // 본 가동 시에는 취득한 Server 토큰을 NoSQL 데이터베이스 등에 보유하고
-  // 유효기간이 지난 경우에만 다시 LINE WORKS에서 취득하도록 구현해 주시기 바랍니다.
   const postdata = {
     url: `https://authapi.worksmobile.com/b/${process.env.API_ID}/server/token`,
     headers: {
@@ -120,7 +118,7 @@ async function getServerTokenFromLineWorks() {
     // LINE WORKS 에서 Server 토큰 가져오기 요청
     request.post(postdata, (error, response, body) => {
       if (error) {
-        console.log('getServerTokenFromLineWorks error')
+        console.log('토큰 가져오기 실패')
         reject(error)
       } else {
         console.log('토큰 가져오기 성공')

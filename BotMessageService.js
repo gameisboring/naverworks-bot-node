@@ -3,7 +3,7 @@ const request = require('request')
 const pool = require('./lib/db')
 
 pool.on('acquire', function (connection) {
-  console.log(`커넥션 풀에서 ${connection.threadId} 번 커넥션 수령`)
+  console.log(`커넥션 풀에서 ${connection.threadId} 번 커넥션 수령 (Message)`)
 })
 
 pool.on('connection', function (connection) {
@@ -11,16 +11,21 @@ pool.on('connection', function (connection) {
 })
 
 pool.on('release', function (connection) {
-  console.log(`커넥션 풀에 ${connection.threadId} 번 커넥션 반납`)
+  console.log(`커넥션 풀에 ${connection.threadId} 번 커넥션 반납 (Message)`)
 })
 
+// 연결상태 유지
+pool.query('SELECT 1')
+setInterval(function () {
+  pool.query('SELECT 1')
+  console.log(`db ping | ${Date()}`)
+}, 1000 * 60 * 60)
+
 const USERS = require('./lib/user')
-/**
- * 콜백 타입
- */
+
 const CALL_BACK_TYPE = {
   /**
-   * 봇이 받는 메시지
+   * 봇이 받는 메시지 타입
    */
   message: 'message',
   join: 'join',
@@ -30,31 +35,13 @@ const CALL_BACK_TYPE = {
   postback: 'postback',
 }
 
-/**
- * 콜백 콘텐츠 타입
- */
 const CALL_BACK_MESSAGE_CONTENT_TYPE = {
-  /**
-   * 텍스트
-   */
   text: 'text',
-  /**
-   * 경로
-   */
   location: 'location',
-  /**
-   * 스탬프
-   */
   sticker: 'sticker',
-  /**
-   * 이미지
-   */
   image: 'image',
 }
 
-/**
- * MESSAGE_CONTENT_TYPE
- */
 const MESSAGE_CONTENT_TYPE = {
   text: 'text',
   image: 'image',
@@ -380,7 +367,7 @@ module.exports = class BotMessageService {
             let sum = this.sumWorkedTime(thisMonthWorkTime)
 
             console.log(
-              `지난 달 총근무시간 :: ${sum} :: ${Math.floor(sum / 60)}시간 ${
+              `이번 분기 총근무시간 :: ${sum} :: ${Math.floor(sum / 60)}시간 ${
                 sum % 60
               }분`
             )
@@ -616,8 +603,3 @@ module.exports = class BotMessageService {
     return `${year}-${month}-${date} ${hours}:${minutes}:${seconds}`
   }
 }
-pool.query('SELECT 1')
-setInterval(function () {
-  pool.query('SELECT 1')
-  console.log(`db ping | ${Date()}`)
-}, 1000 * 60 * 60)
