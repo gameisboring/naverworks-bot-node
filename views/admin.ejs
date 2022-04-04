@@ -91,7 +91,7 @@
         '.updateIO-wrapper .input-out'
       ).value
       var in_time = document.querySelector('.updateIO-wrapper .input-in').value
-
+      in_time.addEventListener
       if (name && date && in_time && out_time) {
         if (in_time > out_time) {
           alert('출근시간 > 퇴근시간')

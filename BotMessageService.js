@@ -1,6 +1,19 @@
 const request = require('request')
 
-const pool = require('./lib/db')
+const mysql = require('mysql2/promise')
+require('dotenv').config()
+
+const { DB_HOST, DB_USER, DB_PASSWORD, DB_DATABASE } = process.env
+
+let pool = mysql.createPool({
+  // host 바꾸기
+  host: DB_HOST,
+  user: DB_USER,
+  port: 3306,
+  password: DB_PASSWORD,
+  database: DB_DATABASE,
+  connectionLimit: 4,
+})
 
 pool.on('acquire', function (connection) {
   console.log(`커넥션 풀에서 ${connection.threadId} 번 커넥션 수령 (Message)`)
@@ -22,6 +35,7 @@ setInterval(function () {
 }, 1000 * 60 * 60)
 
 const USERS = require('./lib/user')
+const { TIME } = require('mysql/lib/protocol/constants/types')
 
 const CALL_BACK_TYPE = {
   /**
@@ -301,18 +315,17 @@ module.exports = class BotMessageService {
           // "근무시간 확인" -> "이번 주 근무시간 조회" 버튼 클릭 액션
           case 'week': {
             const thisWeekWorkTime = await this.getThisWeekWorkTime(id[0])
-            let sum = this.sumWorkedTime(thisWeekWorkTime)
+            const worked_time = this.sumWorkedTime2(thisWeekWorkTime)
+            const hour = worked_time[0]
+            const min = worked_time[1]
+            const sec = worked_time[2]
 
-            console.log(
-              `이번 주 총근무시간 :: ${sum} :: ${Math.floor(sum / 60)}시간 ${
-                sum % 60
-              }분`
-            )
+            console.log(`이번 주 총근무시간 :: ${hour}시간 ${min}분 ${sec}초`)
             res.content = {
               type: MESSAGE_CONTENT_TYPE.text,
-              text: `${this.getName(id[0])}님은 이번 주\n총 [ ${Math.floor(
-                sum / 60
-              )}시간${sum % 60}분 ]\n근무 하셨습니다`,
+              text: `${this.getName(
+                id[0]
+              )}님은 이번 주\n총 [ ${hour}시간 ${min}분 ${sec}초 ]\n근무 하셨습니다`,
             }
             return res
           }
@@ -322,18 +335,17 @@ module.exports = class BotMessageService {
               id[0],
               'this'
             )
-            let sum = this.sumWorkedTime(thisMonthWorkTime)
+            const worked_time = this.sumWorkedTime2(thisMonthWorkTime)
+            const hour = worked_time[0]
+            const min = worked_time[1]
+            const sec = worked_time[2]
 
-            console.log(
-              `이번 달 총근무시간 :: ${sum} :: ${Math.floor(sum / 60)}시간 ${
-                sum % 60
-              }분`
-            )
+            console.log(`이번 달 총근무시간 :: ${hour}시간 ${min}분 ${sec}초`)
             res.content = {
               type: MESSAGE_CONTENT_TYPE.text,
-              text: `${this.getName(id[0])}님은 이번 달\n총 [ ${Math.floor(
-                sum / 60
-              )}시간${sum % 60}분 ]\n근무 하셨습니다`,
+              text: `${this.getName(
+                id[0]
+              )}님은 이번 달\n총 [ ${hour}시간 ${min}분 ${sec}초 ]\n근무 하셨습니다`,
             }
             return res
           }
@@ -343,39 +355,34 @@ module.exports = class BotMessageService {
               id[0],
               'last'
             )
-            let sum = this.sumWorkedTime(thisMonthWorkTime)
+            const worked_time = this.sumWorkedTime2(thisMonthWorkTime)
+            const hour = worked_time[0]
+            const min = worked_time[1]
+            const sec = worked_time[2]
 
-            console.log(
-              `지난 달 총근무시간 :: ${sum} :: ${Math.floor(sum / 60)}시간 ${
-                sum % 60
-              }분`
-            )
+            console.log(`이번 달 총근무시간 :: ${hour}시간 ${min}분 ${sec}초`)
             res.content = {
               type: MESSAGE_CONTENT_TYPE.text,
-              text: `${this.getName(id[0])}님은 지난 달\n총 [ ${Math.floor(
-                sum / 60
-              )}시간${sum % 60}분 ]\n근무 하셨습니다`,
+              text: `${this.getName(
+                id[0]
+              )}님은 이번 달\n총 [ ${hour}시간 ${min}분 ${sec}초 ]\n근무 하셨습니다`,
             }
             return res
           }
 
           case 'quarter': {
-            const thisMonthWorkTime = await this.getQuaterWorkedTime(
-              id[0],
-              'last'
-            )
-            let sum = this.sumWorkedTime(thisMonthWorkTime)
+            const thisQuaterWorkTime = await this.getQuaterWorkedTime(id[0])
+            const worked_time = this.sumWorkedTime2(thisQuaterWorkTime)
+            const hour = worked_time[0]
+            const min = worked_time[1]
+            const sec = worked_time[2]
 
-            console.log(
-              `이번 분기 총근무시간 :: ${sum} :: ${Math.floor(sum / 60)}시간 ${
-                sum % 60
-              }분`
-            )
+            console.log(`이번 달 총근무시간 :: ${hour}시간 ${min}분 ${sec}초`)
             res.content = {
               type: MESSAGE_CONTENT_TYPE.text,
-              text: `${this.getName(id[0])}님은 이번 분기 \n총 [ ${Math.floor(
-                sum / 60
-              )}시간${sum % 60}분 ]\n근무 하셨습니다`,
+              text: `${this.getName(
+                id[0]
+              )}님은 이번 달\n총 [ ${hour}시간 ${min}분 ${sec}초 ]\n근무 하셨습니다`,
             }
             return res
           }
@@ -487,6 +494,14 @@ module.exports = class BotMessageService {
 
     return sum
   }
+  sumWorkedTime2(thisWeekWorkTime) {
+    /* let sum = new Date()
+    for (var i in thisWeekWorkTime) {
+      sum = sum + thisWeekWorkTime[i].worked_time
+    }
+ */
+    return thisWeekWorkTime[0].worked_time.split(':')
+  }
 
   async getTodayWorkTime(callbackDate, id) {
     const query = `SELECT truncate(timestampdiff(minute,_in,_out) / 60,0) as worked_hour,
@@ -503,7 +518,7 @@ module.exports = class BotMessageService {
   }
 
   async getThisWeekWorkTime(id) {
-    const query = `SELECT date_format(lastupdate,'%a') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',lastupdate,_out)) AS 'worked_time' FROM io_status WHERE date(lastupdate)
+    const query = `SELECT sec_to_time(SUM(TIMESTAMPDIFF(second,_in,if(now='IN',lastupdate,_out)))) AS 'worked_time' FROM io_status WHERE date(lastupdate)
     BETWEEN SUBDATE(DATE(DATE_ADD(NOW(),INTERVAL 8 HOUR)),DATE_FORMAT(DATE_ADD(NOW(),INTERVAL 8 HOUR), '%w'))
     AND SUBDATE(date(DATE_ADD(NOW(),INTERVAL 8 HOUR)),DATE_FORMAT(DATE_ADD(NOW(),INTERVAL 8 HOUR),'%w')-6)
     AND mac = '${this.getMac(id)}';`
@@ -519,7 +534,7 @@ module.exports = class BotMessageService {
   }
 
   async getQuaterWorkedTime(id) {
-    const query = `SELECT date_format(lastupdate,'%d') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',lastupdate,_out)) AS 'worked_time'
+    const query = `SELECT sec_to_time(SUM(TIMESTAMPDIFF(second,_in,if(now='IN',lastupdate,_out))))  AS 'worked_time'
     FROM io_status where quarter(lastupdate) = 1 
     AND mac = '${this.getMac(id)}';`
     try {
@@ -534,7 +549,7 @@ module.exports = class BotMessageService {
 
   async getMonthlyWorkTime(id, when) {
     if (when === 'this') {
-      const query = `SELECT date_format(lastupdate,'%d') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',lastupdate,_out)) AS 'worked_time'
+      const query = `SELECT sec_to_time(SUM(TIMESTAMPDIFF(second,_in,if(now='IN',lastupdate,_out)))) AS 'worked_time'
     FROM io_status where date_format(lastupdate,'%m') = DATE_FORMAT(DATE_ADD(NOW(),INTERVAL 8 HOUR), '%m')
     AND mac = '${this.getMac(id)}';`
       try {
@@ -546,7 +561,7 @@ module.exports = class BotMessageService {
         )
       }
     } else if (when === 'last') {
-      const query = `SELECT date_format(lastupdate,'%d') as 'day',TIMESTAMPDIFF(minute,_in,if(now='IN',lastupdate,_out)) AS 'worked_time'
+      const query = `SELECT sec_to_time(SUM(TIMESTAMPDIFF(second,_in,if(now='IN',lastupdate,_out))))  AS 'worked_time'
       FROM io_status where date_format(lastupdate,'%m') = DATE_FORMAT(LAST_DAY(NOW() - interval 1 month), '%m') 
       AND mac = '${this.getMac(id)}';`
       try {
