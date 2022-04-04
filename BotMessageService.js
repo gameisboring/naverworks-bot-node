@@ -371,18 +371,47 @@ module.exports = class BotMessageService {
           }
 
           case 'quarter': {
-            const thisQuaterWorkTime = await this.getQuaterWorkedTime(id[0])
+            res.content = {
+              type: MESSAGE_CONTENT_TYPE.buttonTemplate,
+              contentText: '해당하는 버튼을 클릭하세요',
+              actions: this._getQuaterButtonActions(),
+            }
+            return res
+          }
+
+          case 'quater 1':
+          case 'quater 2':
+          case 'quater 3':
+          case 'quater 4': {
+            console.log('분기 분기 분기분기')
+            const quaterNum = callbackEvent.content.postback.slice(-1)
+            const thisQuaterWorkTime = await this.getQuaterWorkedTime(
+              id[0],
+              quaterNum
+            )
+            console.log(thisQuaterWorkTime[0].worked_time)
+            if (!thisQuaterWorkTime[0].worked_time) {
+              res.content = {
+                type: MESSAGE_CONTENT_TYPE.text,
+                text: `${this.getName(
+                  id[0]
+                )}님은 ${quaterNum}분기\n근무내역이 존재하지 않습니다`,
+              }
+              return res
+            }
             const worked_time = this.sumWorkedTime2(thisQuaterWorkTime)
             const hour = worked_time[0]
             const min = worked_time[1]
             const sec = worked_time[2]
 
-            console.log(`이번 달 총근무시간 :: ${hour}시간 ${min}분 ${sec}초`)
+            console.log(
+              `${quaterNum}분기 총근무시간 :: ${hour}시간 ${min}분 ${sec}초`
+            )
             res.content = {
               type: MESSAGE_CONTENT_TYPE.text,
               text: `${this.getName(
                 id[0]
-              )}님은 이번 달\n총 [ ${hour}시간 ${min}분 ${sec}초 ]\n근무 하셨습니다`,
+              )}님은 ${quaterNum}분기\n총 [ ${hour}시간 ${min}분 ${sec}초 ]\n근무 하셨습니다`,
             }
             return res
           }
@@ -467,6 +496,35 @@ module.exports = class BotMessageService {
     ]
   }
 
+  _getQuaterButtonActions(createdTime) {
+    return [
+      {
+        type: 'message',
+        label: '1분기',
+        text: '1분기 근무시간 조회',
+        postback: 'quater 1',
+      },
+      {
+        type: 'message',
+        label: '2분기',
+        text: '2분기 근무시간 조회',
+        postback: 'quater 2',
+      },
+      {
+        type: 'message',
+        label: '3분기',
+        text: '3분기 근무시간 조회',
+        postback: 'quater 3',
+      },
+      {
+        type: 'message',
+        label: '4분기',
+        text: '4분기 근무시간 조회',
+        postback: 'quater 4',
+      },
+    ]
+  }
+
   getMac(id) {
     try {
       const mac = USERS[id].MAC
@@ -495,11 +553,6 @@ module.exports = class BotMessageService {
     return sum
   }
   sumWorkedTime2(thisWeekWorkTime) {
-    /* let sum = new Date()
-    for (var i in thisWeekWorkTime) {
-      sum = sum + thisWeekWorkTime[i].worked_time
-    }
- */
     return thisWeekWorkTime[0].worked_time.split(':')
   }
 
@@ -533,9 +586,9 @@ module.exports = class BotMessageService {
     }
   }
 
-  async getQuaterWorkedTime(id) {
+  async getQuaterWorkedTime(id, quaterNum) {
     const query = `SELECT sec_to_time(SUM(TIMESTAMPDIFF(second,_in,if(now='IN',lastupdate,_out))))  AS 'worked_time'
-    FROM io_status where quarter(lastupdate) = 1 
+    FROM io_status where quarter(lastupdate) = ${quaterNum} 
     AND mac = '${this.getMac(id)}';`
     try {
       const result = await pool.query(query)
