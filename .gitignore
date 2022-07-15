@@ -108,4 +108,5 @@ key/
 
 # DB file
 lib/db.js
+lib/user.js
 lib/user.json

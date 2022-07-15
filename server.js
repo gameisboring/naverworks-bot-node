@@ -53,7 +53,7 @@ app.post('/updateIO', async function (req, res) {
   console.log(req.body)
   const { name, date, in_time, out_time } = req.body
   const adminService = new AdminService()
-  await adminService._upUserIO(name, date, in_time, out_time)
+  await adminService.updateUserIO(name, date, in_time, out_time)
 
   res.sendStatus(200)
 })

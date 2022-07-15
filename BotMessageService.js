@@ -1,4 +1,7 @@
 const request = require('request')
+const Query = require('./query')
+
+const sql = new Query()
 
 const mysql = require('mysql2/promise')
 require('dotenv').config()
@@ -6,7 +9,6 @@ require('dotenv').config()
 const { DB_HOST, DB_USER, DB_PASSWORD, DB_DATABASE } = process.env
 
 let pool = mysql.createPool({
-  // host 바꾸기
   host: DB_HOST,
   user: DB_USER,
   port: 3306,
@@ -17,10 +19,6 @@ let pool = mysql.createPool({
 
 pool.on('acquire', function (connection) {
   console.log(`커넥션 풀에서 ${connection.threadId} 번 커넥션 수령 (Message)`)
-})
-
-pool.on('connection', function (connection) {
-  connection.query('SET SESSION auto_increment_increment=1')
 })
 
 pool.on('release', function (connection) {
@@ -164,7 +162,7 @@ module.exports = class BotMessageService {
       if (callbackEvent.content.type === CALL_BACK_MESSAGE_CONTENT_TYPE.text) {
         // 아이디 추상화
         const id = callbackEvent.source.accountId.split('@')
-        //
+
         const callbackTime = this.getCallbackTime(
           new Date(callbackEvent.createdTime)
         )
@@ -193,7 +191,6 @@ module.exports = class BotMessageService {
 
           // "출근하기" 버튼 클릭 액션
           case '출근': {
-            let query = `SELECT _in FROM io_status WHERE mac = ? AND date_format(lastupdate,'%Y-%m-%d') = date_format(?,'%Y-%m-%d');`
             try {
               // 출근 처리 요청 로그
               console.log(
@@ -202,7 +199,7 @@ module.exports = class BotMessageService {
                 )} 님 ${callbackTime}에 출근처리(UPDATE) 요청`
               )
               // DB 조회 쿼리 실행문
-              const result = await pool.query(query, [
+              const result = await pool.query(sql.checkNowStatus, [
                 this.getMac(id[0]),
                 callbackTime,
               ])
@@ -221,15 +218,12 @@ module.exports = class BotMessageService {
 
                 return res
               } else {
-                query = `UPDATE io_status 
-                  SET now = 'IN',
-                  lastupdate = '${callbackTime}',
-                  _in = '${callbackTime}'
-                  WHERE date_format('${callbackTime}','%y-%m-%d') 
-                  = date_format(lastupdate,'%y-%m-%d') 
-                  AND mac = '${this.getMac(id[0])}';`
-
-                const updateResult = await pool.query(query)
+                const updateResult = await pool.query(sql.updateIn, [
+                  callbackTime,
+                  callbackTime,
+                  callbackTime,
+                  this.getMac(id[0]),
+                ])
                 if (updateResult[0].affectedRows > 0) {
                   console.log('update 성공')
                   res.content = {
@@ -253,12 +247,11 @@ module.exports = class BotMessageService {
 
           // "퇴근하기" 버튼 클릭 액션
           case '퇴근': {
-            let query = `SELECT _in FROM io_status 
-            WHERE mac = '${this.getMac(id[0])}' 
-            AND date_format(lastupdate,'%Y-%m-%d') = date_format('${callbackTime}','%Y-%m-%d');`
-
             try {
-              const result = await pool.query(query)
+              const result = await pool.query(sql.checkNowStatus, [
+                this.getMac(id[0]),
+                callbackTime,
+              ])
 
               if (result[0][0]._in === null) {
                 res.content = {
@@ -267,14 +260,12 @@ module.exports = class BotMessageService {
                 }
                 return res
               } else {
-                query = `UPDATE io_status 
-                  SET now = 'OUT',
-                  lastupdate = '${callbackTime}',
-                  _out = '${callbackTime}'
-                  WHERE date_format('${callbackTime}','%y-%m-%d') 
-                  = date_format(lastupdate,'%y-%m-%d') 
-                  AND mac = '${this.getMac(id[0])}';`
-                const updateResult = await pool.query(query)
+                const updateResult = await pool.query(sql.updateOut, [
+                  callbackTime,
+                  callbackTime,
+                  callbackTime,
+                  this.getMac(id[0]),
+                ])
 
                 if (updateResult[0].affectedRows > 0) {
                   console.log('update 성공')
@@ -299,6 +290,12 @@ module.exports = class BotMessageService {
               }
             } catch (err) {
               console.error(`Database connection error (퇴근): ${err.message}`)
+              console.log('update 에 실패했습니다')
+              res.content = {
+                type: MESSAGE_CONTENT_TYPE.text,
+                text: '퇴근 처리에 실패했습니다',
+              }
+              return res
             }
             break
           }
@@ -315,7 +312,7 @@ module.exports = class BotMessageService {
           // "근무시간 확인" -> "이번 주 근무시간 조회" 버튼 클릭 액션
           case 'week': {
             const thisWeekWorkTime = await this.getThisWeekWorkTime(id[0])
-            const worked_time = this.sumWorkedTime2(thisWeekWorkTime)
+            const worked_time = this.sumWorkedTime(thisWeekWorkTime)
             const hour = worked_time[0]
             const min = worked_time[1]
             const sec = worked_time[2]
@@ -335,7 +332,7 @@ module.exports = class BotMessageService {
               id[0],
               'this'
             )
-            const worked_time = this.sumWorkedTime2(thisMonthWorkTime)
+            const worked_time = this.sumWorkedTime(thisMonthWorkTime)
             const hour = worked_time[0]
             const min = worked_time[1]
             const sec = worked_time[2]
@@ -355,7 +352,7 @@ module.exports = class BotMessageService {
               id[0],
               'last'
             )
-            const worked_time = this.sumWorkedTime2(thisMonthWorkTime)
+            const worked_time = this.sumWorkedTime(thisMonthWorkTime)
             const hour = worked_time[0]
             const min = worked_time[1]
             const sec = worked_time[2]
@@ -383,7 +380,6 @@ module.exports = class BotMessageService {
           case 'quater 2':
           case 'quater 3':
           case 'quater 4': {
-            console.log('분기 분기 분기분기')
             const quaterNum = callbackEvent.content.postback.slice(-1)
             const thisQuaterWorkTime = await this.getQuaterWorkedTime(
               id[0],
@@ -399,7 +395,7 @@ module.exports = class BotMessageService {
               }
               return res
             }
-            const worked_time = this.sumWorkedTime2(thisQuaterWorkTime)
+            const worked_time = this.sumWorkedTime(thisQuaterWorkTime)
             const hour = worked_time[0]
             const min = worked_time[1]
             const sec = worked_time[2]
@@ -544,26 +540,16 @@ module.exports = class BotMessageService {
     }
   }
 
-  sumWorkedTime(thisWeekWorkTime) {
-    let sum = 0
-    for (var i in thisWeekWorkTime) {
-      sum = sum + thisWeekWorkTime[i].worked_time
-    }
-
-    return sum
-  }
-  sumWorkedTime2(thisWeekWorkTime) {
-    return thisWeekWorkTime[0].worked_time.split(':')
+  sumWorkedTime(time) {
+    return time[0].worked_time.split(':')
   }
 
   async getTodayWorkTime(callbackDate, id) {
-    const query = `SELECT truncate(timestampdiff(minute,_in,_out) / 60,0) as worked_hour,
-    timestampdiff(minute,_in,_out) % 60 as worked_minute
-    ,_in,_out FROM io_status WHERE mac = '${await this.getMac(
-      id
-    )}' AND date_format(lastupdate,'%Y-%m-%d') = date_format('${callbackDate}','%Y-%m-%d');`
     try {
-      const result = await pool.query(query)
+      const result = await pool.query(sql.selectTodayWorkTime, [
+        await this.getMac(id),
+        callbackDate,
+      ])
       return result
     } catch (err) {
       console.error(`Database connection error (getWorkTime): ${err.message}`)
@@ -571,13 +557,10 @@ module.exports = class BotMessageService {
   }
 
   async getThisWeekWorkTime(id) {
-    const query = `SELECT sec_to_time(SUM(TIMESTAMPDIFF(second,_in,if(now='IN',lastupdate,_out)))) AS 'worked_time' FROM io_status WHERE date(lastupdate)
-    BETWEEN SUBDATE(DATE(DATE_ADD(NOW(),INTERVAL 8 HOUR)),DATE_FORMAT(DATE_ADD(NOW(),INTERVAL 8 HOUR), '%w'))
-    AND SUBDATE(date(DATE_ADD(NOW(),INTERVAL 8 HOUR)),DATE_FORMAT(DATE_ADD(NOW(),INTERVAL 8 HOUR),'%w')-6)
-    AND mac = '${this.getMac(id)}';`
-
     try {
-      const result = await pool.query(query)
+      const result = await pool.query(sql.selectThisWeekWorkTime, [
+        this.getMac(id),
+      ])
       return result[0]
     } catch (err) {
       console.error(
@@ -587,11 +570,11 @@ module.exports = class BotMessageService {
   }
 
   async getQuaterWorkedTime(id, quaterNum) {
-    const query = `SELECT sec_to_time(SUM(TIMESTAMPDIFF(second,_in,if(now='IN',lastupdate,_out))))  AS 'worked_time'
-    FROM io_status where quarter(lastupdate) = ${quaterNum} 
-    AND mac = '${this.getMac(id)}';`
     try {
-      const result = await pool.query(query)
+      const result = await pool.query(sql.selectQuaterWorkTime, [
+        quaterNum,
+        this.getMac(id),
+      ])
       return result[0]
     } catch (err) {
       console.error(
@@ -602,11 +585,10 @@ module.exports = class BotMessageService {
 
   async getMonthlyWorkTime(id, when) {
     if (when === 'this') {
-      const query = `SELECT sec_to_time(SUM(TIMESTAMPDIFF(second,_in,if(now='IN',lastupdate,_out)))) AS 'worked_time'
-    FROM io_status where date_format(lastupdate,'%m') = DATE_FORMAT(DATE_ADD(NOW(),INTERVAL 8 HOUR), '%m')
-    AND mac = '${this.getMac(id)}';`
       try {
-        const result = await pool.query(query)
+        const result = await pool.query(sql.selectThisMonthlyWorkTime, [
+          this.getMac(id),
+        ])
         return result[0]
       } catch (err) {
         console.error(
@@ -614,11 +596,10 @@ module.exports = class BotMessageService {
         )
       }
     } else if (when === 'last') {
-      const query = `SELECT sec_to_time(SUM(TIMESTAMPDIFF(second,_in,if(now='IN',lastupdate,_out))))  AS 'worked_time'
-      FROM io_status where date_format(lastupdate,'%m') = DATE_FORMAT(LAST_DAY(NOW() - interval 1 month), '%m') 
-      AND mac = '${this.getMac(id)}';`
       try {
-        const result = await pool.query(query)
+        const result = await pool.query(sql.selectLastMonthlyWorkTime, [
+          this.getMac(id),
+        ])
         return result[0]
       } catch (err) {
         console.error(

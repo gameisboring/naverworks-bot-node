@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package*.json /app/
 RUN npm install 
 COPY . /app
-EXPOSE 3000
+EXPOSE 3002
 ENV NODE_ENV development
 ENV TZ=Asia/Seoul 
 CMD ["npm", "start"]
