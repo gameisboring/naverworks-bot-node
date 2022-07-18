@@ -22,7 +22,7 @@ module.exports = class Query {
 
   checkNowStatus = `SELECT _in FROM io_status WHERE mac = ? AND DATE_FORMAT(lastupdate,'%Y-%m-%d') = DATE_FORMAT(?,'%Y-%m-%d');`
 
-  updateOut = `UPDATE io_status SET _out = ? now = 'OUT', lastupdate = ? WHERE DATE_FORMAT(?,'%y-%m-%d') = DATE_FORMAT(lastupdate,'%y-%m-%d') AND mac = ?;`
+  updateOut = `UPDATE io_status SET _out = ?, now = 'OUT', lastupdate = ? WHERE DATE_FORMAT(?,'%y-%m-%d') = DATE_FORMAT(lastupdate,'%y-%m-%d') AND mac = ?;`
 
   updateIn = `UPDATE io_status SET now = 'IN',lastupdate = ?,_in = ? WHERE DATE_FORMAT(?,'%y-%m-%d') = DATE_FORMAT(lastupdate,'%y-%m-%d') AND mac = ?;`
 }
